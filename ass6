@@ -1,0 +1,463 @@
+
+#include<stdio.h>
+#include<conio.h>
+#include<windows.h>
+#pragma warning(disable : 4996)
+
+CONST int divisor=4;
+CONST int weekDaysNo =7;
+CONST int numberOfMonths=12;
+
+
+struct Date
+{
+    int day;
+    int month;
+    int year;
+};
+Date date;
+
+struct Reminder
+{
+    int day;
+    int month;
+    char note[50];
+};
+Reminder reminder;
+
+COORD coord = { 0 , 0 };
+
+
+void GotoXY(int column, int line)
+{
+    coord.X = column;
+    coord.Y = line;
+
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleCursorPosition(hConsole, coord);
+
+}
+
+void setColor(int color)
+{
+    WORD wColor;
+    HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+
+    if (GetConsoleScreenBufferInfo(hStdOut, &csbi))
+    {
+        wColor = (csbi.wAttributes & 0xF0) + (color & 0x0F);
+        SetConsoleTextAttribute(hStdOut, wColor);
+    }
+    return;
+}
+
+void ClearConsoleToColors(int ForgC, int BackC)
+{
+
+    WORD wColor = ((BackC & 0x0F) << divisor) + (ForgC & 0x0F);
+    HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    COORD coord = { 0, 0 };
+
+    DWORD count;
+
+
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    SetConsoleTextAttribute(hStdOut, wColor);
+    if (GetConsoleScreenBufferInfo(hStdOut, &csbi))
+    {
+        FillConsoleOutputCharacter(hStdOut, (TCHAR)32, csbi.dwSize.X * csbi.dwSize.Y, coord, &count);
+
+        FillConsoleOutputAttribute(hStdOut, csbi.wAttributes, csbi.dwSize.X * csbi.dwSize.Y, coord, &count);
+        SetConsoleCursorPosition(hStdOut, coord);
+    }
+    return;
+}
+
+void SetColorAndBackground(int ForgColor, int BackColor)
+{
+    int bColor, fColor;
+    bColor = (BackColor & 0x0F) << divisor;
+    fColor = ForgColor & 0x0F;
+    WORD wColor = bColor + fColor;
+    HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(hStdOut, wColor);
+    return;
+}
+
+int check_leapYear(int year)
+{
+    if (year % 400 == 0 || (year % 100 != 0 && year % divisor == 0))
+        return 1;
+    return 0;
+}
+
+void increase_month(int* month, int* year)
+{
+    ++* month;
+    if (*month > numberOfMonths)
+    {
+        ++* year;
+        *month = *month - numberOfMonths;
+    }
+}
+
+void decrease_month(int* month, int* year)
+{
+    --* month;
+    if (*month < 1)
+    {
+        --* year;
+
+        if (*year < 1600)
+        {
+            printf("No record available");
+            return;
+        }
+        *month = *month + numberOfMonths;
+    }
+}
+
+int getNumberOfDays(int month, int year)
+{
+    switch (month)
+    {
+    case 1: return(31);
+    case 2: if (check_leapYear(year) == 1)
+        return(29);
+          else
+        return(28);
+    case 3: return(31);
+    case 4: return(30);
+    case 5: return(31);
+    case 6: return(30);
+    case 7: return(31);
+    case 8: return(31);
+    case 9: return(30);
+    case 10: return(31);
+    case 11: return(30);
+    case 12: return(31);
+    default: return(-1);
+    }
+}
+
+const char* getName(int day)
+{
+    switch (day)
+    {
+    case 0:return("Sunday");
+    case 1:return("Monday");
+    case 2:return("Tuesday");
+    case 3:return("Wednesday");
+    case 4:return("Thursday");
+    case 5:return("Friday");
+    case 6:return("Saturday");
+    default:return("Error in getName() module.Invalid argument passed");
+    }
+}
+
+int DayNumber(int day, int month, int year)
+{
+    int result = 0, t1, t2, y = year;
+    year = year - 1600;
+    while (year >= 100) {
+        result = result + 5;
+        year = year - 100;
+    }
+    result = (result % weekDaysNo);
+    t1 = ((year - 1) / divisor);
+    t2 = (year - 1) - t1;
+    t1 = (t1 * 2) + t2;
+    t1 = (t1 % 7);
+    result = result + t1;
+    result = result % weekDaysNo;
+    t2 = 0;
+    for (t1 = 1; t1 < month; t1++) {
+        t2 += getNumberOfDays(t1, y);
+    }
+    t2 = t2 + day;
+    t2 = t2 % weekDaysNo;
+    result = result + t2;
+    result = result % weekDaysNo;
+    if (y > 2000)
+        result = result + 1;
+    result = result % weekDaysNo;
+    return result;
+}
+
+const char* getDay(int day, int month, int year) {
+    int Day, NumberOfDays=0;
+    NumberOfDays = getNumberOfDays(month, year);
+    if (!(month >= 1 && month <= numberOfMonths))
+    {
+        return("Invalid month value");
+    }
+    if (!(day >= 1 && day <= NumberOfDays))
+    {
+        return("Invalid date");
+    }
+    if (year >= 1600)
+    {
+        Day = DayNumber(day, month, year);
+        Day = Day % weekDaysNo;
+        return(getName(Day));
+    }
+    else
+    {
+        return("Please give year more than 1600");
+    }
+
+}
+
+int checkNote(int day, int month) {
+    FILE* fp;
+    fp = fopen("note.dat", "rb");
+    if (fp == NULL)
+    {
+        printf("Error in Opening the file");
+    }
+    while (fread(&reminder, sizeof(reminder), 1, fp) == 1)
+    {
+        if (reminder.day == day && reminder.month == month) {
+            fclose(fp);
+            return 1;
+        }
+    }
+    fclose(fp);
+    return 0;
+}
+
+void printMonth(int month, int year, int x, int y)
+{
+    int nod, day, cnt, d = 1, x1 = x, y1 = y, isNote = 0;
+    if (!(month >= 1 && month <= 12))
+    {
+        printf("INVALID MONTH");
+        _getch();
+        return;
+    }
+    if (!(year >= 1600))
+    {
+        printf("INVALID YEAR");
+        _getch();
+        return;
+    }
+    GotoXY(20, y);
+    printf("---------------------------\n");
+    GotoXY(25, 6);
+    switch (month) {
+    case 1: printf("January"); break;
+    case 2: printf("February"); break;
+    case 3: printf("March"); break;
+    case 4: printf("April"); break;
+    case 5: printf("May"); break;
+    case 6: printf("June"); break;
+    case 7: printf("July"); break;
+    case 8: printf("August"); break;
+    case 9: printf("September"); break;
+    case 10: printf("October"); break;
+    case 11: printf("November"); break;
+    case 12: printf("December"); break;
+    }
+    printf(" , %d", year);
+    GotoXY(20, 7);
+    printf("---------------------------");
+
+    y += 3;
+    GotoXY(x, y);
+    printf("S   M   T   W   T   F   S   ");
+    y++;
+    nod = getNumberOfDays(month, year);
+    day = DayNumber(d, month, year);
+    switch (day)
+    {
+    case 0:
+        x = x;
+        cnt = 1;
+        break;
+    case 1:
+        x = x + 4;
+        cnt = 2;
+        break;
+    case 2:
+        x = x + 8;
+        cnt = 3;
+        break;
+    case 3:
+        x = x + 12;
+        cnt = 4;
+        break;
+    case 4:
+        x = x + 16;
+        cnt = 5;
+        break;
+    case 5:
+        x = x + 20;
+        cnt = 6;
+        break;
+    case 6:
+        x = x + 24;
+        cnt = 7;
+        break;
+    default:
+        printf("INVALID DATA FROM THE getOddNumber()MODULE");
+        return;
+    }
+    GotoXY(x, y);
+    if (cnt == 1)
+    {
+        setColor(12);
+    }
+    if (checkNote(d, month) == 1)
+    {
+        SetColorAndBackground(15, 12);
+    }
+    printf("%02d", d);
+    SetColorAndBackground(15, 1);
+    for (d = 2; d <= nod; d++)
+    {
+        if (cnt % weekDaysNo == 0)
+        {
+            y++;
+            cnt = 0;
+            x = x1 - 4;
+        }
+        x = x + 4;
+        cnt++;
+        GotoXY(x, y);
+        if (cnt == 1)
+        {
+            setColor(12);
+        }
+        else
+        {
+            setColor(15);
+        }
+        if (checkNote(d, month) == 1)
+        {
+            SetColorAndBackground(15, 12);
+        }
+        printf("%02d", d);
+        SetColorAndBackground(15, 1);
+    }
+    GotoXY(8, y + 2);
+    setColor(14);
+    printf("Press 'n'  to Next, Press 'p' to Previous and 'q' to Quit");
+    GotoXY(8, y + 3);
+    printf("Red Background indicates the NOTE, Press 's' to see note: ");
+    setColor(15);
+}
+
+void AddNote() {
+    FILE* fp;
+    fp = fopen("note.dat", "ab+");
+    system("cls");
+    GotoXY(5, 7);
+    printf("Enter the date(DD MM): ");
+    scanf_s("%d %d", &reminder.day, &reminder.month);
+    GotoXY(5, 8);
+    printf("Enter the Note(50 character max): ");
+    fflush(stdin);
+    scanf(" %[^\n]", reminder.note);
+    if (fwrite(&reminder, sizeof(reminder), 1, fp)) {
+        GotoXY(5, 12);
+        puts("Note is saved sucessfully");
+        fclose(fp);
+    }
+    else {
+        GotoXY(5, 12);
+        setColor(12);
+        puts("\aFail to save!!\a");
+
+        setColor(15);
+    }
+    GotoXY(5, 15);
+    printf("Press any key............");
+    _getch();
+    fclose(fp);
+}
+
+void showNote(int month) {
+    FILE* fp;
+    int i = 0, isFound = 0;
+    system("cls");
+    fp = fopen("note.dat", "rb");
+    if (fp == NULL) {
+        printf("Error in opening the file");
+    }
+    while (fread(&reminder, sizeof(reminder), 1, fp) == 1)
+    {
+        if (reminder.month == month)
+        {
+            GotoXY(10, 5 + i);
+            printf("Note %d Day = %d: %s", i + 1, reminder.day, reminder.note);
+            isFound = 1;
+            i++;
+        }
+    }
+    if (isFound == 0)
+    {
+        GotoXY(10, 5);
+        printf("This Month contains no note");
+    }
+    GotoXY(10, 7 + i);
+    printf("Press any key to back.......");
+    _getch();
+
+}
+
+int main() {
+    ClearConsoleToColors(15, 1);
+    SetConsoleTitleA("Calender Project - Programming-technique.blogspot.com");
+
+    int choice;
+    char ch = 'a';
+    while (1) {
+        system("cls");
+        printf("1. Find Out the Day\n");
+        printf("2. Print all the day of month\n");
+        printf("3. Add Note\n");
+        printf("4. EXIT\n");
+        printf("ENTER YOUR CHOICE : ");
+        scanf_s("%d", &choice);
+        system("cls");
+        switch (choice) {
+        case 1:
+            printf("Enter date (DD MM YYYY) : ");
+            scanf_s("%d %d %d", &date.day, &date.month, &date.year);
+            printf("Day is : %s", getDay(date.day, date.month, date.year));
+            printf("\nPress any key to continue......");
+            _getch();
+            break;
+        case 2:
+            printf("Enter month and year (MM YYYY) : ");
+            scanf_s("%d %d", &date.month, &date.year);
+            system("cls");
+            while (ch != 'q') {
+                printMonth(date.month, date.year, 20, 5);
+                ch = _getch();
+                if (ch == 'n') {
+                    increase_month(&date.month, &date.year);
+                    system("cls");
+                    printMonth(date.month, date.year, 20, 5);
+                }
+                else if (ch == 'p') {
+                    decrease_month(&date.month, &date.year);
+                    system("cls");
+                    printMonth(date.month, date.year, 20, 5);
+                }
+                else if (ch == 's') {
+                    showNote(date.month);
+                    system("cls");
+                }
+            }
+            break;
+        case 3:
+            AddNote();
+            break;
+        case 4:
+            exit(0);
+        }
+    }
+    return 0;
+}
